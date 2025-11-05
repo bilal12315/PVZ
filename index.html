@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Plants vs Zombies — Мини игра</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background: #2e7d32;
+  }
+
+  .box {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    background: url('game.png') no-repeat center/100% 100%;
+    overflow: hidden;
+  }
+   
+  .mower {
+    position: absolute;
+    width: 100px;
+    left: 60px;
+    z-index: 2;
+  }
+
+  .shooter {
+    position: absolute;
+    width: 80px;
+    left: 470px;
+    z-index: 3;
+    margin-top: -70px;
+    transition: opacity 0.2s;
+  }
+
+  .zombie {
+    position: absolute;
+    width: 80px;
+    right: -100px;
+    z-index: 4;
+    margin-top: -70px;
+  }
+
+  .bullet {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: radial-gradient(circle, #9acd32, #006400);
+    border-radius: 50%;
+    z-index: 2;
+  }
+
+  .score {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 2px 2px 4px #000;
+  }
+</style>
+</head>
+<body>
+
+<div class="box">
+  <div class="score">Счёт: 0</div>
+
+  <!-- Газонокосилки -->
+  <img src="lawnmower.png" class="mower" style="top: 240px;">
+  <img src="lawnmower.png" class="mower" style="top: 340px;">
+  <img src="lawnmower.png" class="mower" style="top: 440px;">
+  <img src="lawnmower.png" class="mower" style="top: 540px;">
+  <img src="lawnmower.png" class="mower" style="top: 640px;">
+
+  <!-- Горошек -->
+  <img src="peashooter.png" class="shooter" style="top: 250px;">
+  <img src="peashooter.png" class="shooter" style="top: 350px;">
+  <img src="peashooter.png" class="shooter" style="top: 450px;">
+  <img src="peashooter.png" class="shooter" style="top: 550px;">
+  <img src="peashooter.png" class="shooter" style="top: 650px;">
+</div>
+
+<script>
+const box = document.querySelector('.box');
+const shooters = document.querySelectorAll('.shooter');
+const scoreEl = document.querySelector('.score');
+let score = 0;
+
+// флаг готовности каждого горохострела
+const shooterReady = new Map();
+shooters.forEach(sh => shooterReady.set(sh, true));
+
+// проверка зомби и стрельба
+setInterval(() => {
+  shooters.forEach(shooter => {
+    const shooterTop = shooter.offsetTop;
+    const zombies = document.querySelectorAll('.zombie');
+    
+    let zombieInRow = false;
+
+    zombies.forEach(zombie => {
+      if (Math.abs(zombie.offsetTop - shooterTop) < 50) {
+        if (zombie.getBoundingClientRect().left > shooter.getBoundingClientRect().right) {
+          zombieInRow = true;
+        }
+      }
+    });
+
+    // стреляет только если зомби в ряду и горохострел готов
+    if (zombieInRow && shooterReady.get(shooter)) {
+      shooterReady.set(shooter, false);
+      shooter.style.opacity = 0.6; // эффект перезарядки
+      shoot(shooter, () => {
+        shooterReady.set(shooter, true);
+        shooter.style.opacity = 1;
+      });
+    }
+  });
+}, 200);
+
+// функция выстрела
+function shoot(shooter, onDone) {
+  const bullet = document.createElement('div');
+  bullet.classList.add('bullet');
+  let top = shooter.offsetTop + 25;
+  let left = shooter.offsetLeft + 70;
+  bullet.style.top = top + 'px';
+  bullet.style.left = left + 'px';
+  box.appendChild(bullet);
+
+  const move = setInterval(() => {
+    left += 4;
+    bullet.style.left = left + 'px';
+
+    document.querySelectorAll('.zombie').forEach(z => {
+      const zb = z.getBoundingClientRect();
+      const bb = bullet.getBoundingClientRect();
+
+      if (
+        bb.left < zb.right &&
+        bb.right > zb.left &&
+        bb.top < zb.bottom &&
+        bb.bottom > zb.top
+      ) {
+        z.health -= 1;
+        bullet.remove();
+        clearInterval(move);
+        onDone(); // разрешаем стрелять снова
+
+        if (z.health <= 0) {
+          z.remove();
+          score++;
+          scoreEl.textContent = 'Счёт: ' + score;
+        }
+      }
+    });
+
+    if (left > window.innerWidth) {
+      bullet.remove();
+      clearInterval(move);
+      onDone(); // горох улетел — можно снова стрелять
+    }
+  }, 20);
+}
+
+// появление зомби
+function spawnZombie() {
+  const zombie = document.createElement('img');
+  zombie.src = 'zombie1.png';
+  zombie.classList.add('zombie');
+  zombie.style.top = 220 + Math.floor(Math.random() * 5) * 100 + 'px';
+  zombie.health = 3;
+  box.appendChild(zombie);
+
+  let pos = window.innerWidth;
+  const move = setInterval(() => {
+    pos -= 0.8;
+    zombie.style.right = window.innerWidth - pos + 'px';
+
+    shooters.forEach(sh => {
+      const zb = zombie.getBoundingClientRect();
+      const sb = sh.getBoundingClientRect();
+
+      if (
+        zb.left < sb.right &&
+        zb.right > sb.left &&
+        zb.top < sb.bottom &&
+        zb.bottom > sb.top
+      ) {
+        sh.style.opacity = 0.4;
+        setTimeout(() => {
+          sh.remove();
+        }, 1500);
+        clearInterval(move);
+      }
+    });
+
+    if (pos < 0) {
+      zombie.remove();
+      clearInterval(move);
+    }
+  }, 20);
+}
+
+setInterval(spawnZombie, 3000);
+</script>
+
+</body>
+</html>
